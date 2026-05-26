@@ -1,11 +1,11 @@
 // ✅ 여기에 본인의 Firebase 설정값을 입력하세요
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBStgnExqCIxAWDeos6GhCUoeytRXYDUzY",
+  authDomain: "study-a0bf2.firebaseapp.com",
+  projectId: "study-a0bf2",
+  storageBucket: "study-a0bf2.firebasestorage.app",
+  messagingSenderId: "407215369136",
+  appId: "1:407215369136:web:705aa11c2a41c60ead8475"
 };
 
 // Firebase 초기화
