@@ -64,6 +64,42 @@ async function handleLogin() {
   }
 }
 
+async function handleSignup() {
+  const name = $('signup-name').value.trim();
+  const email = $('signup-email').value.trim();
+  const pw = $('signup-pw').value;
+  const pw2 = $('signup-pw2').value;
+  const err = $('signup-error');
+  err.style.display = 'none';
+
+  if (!name) { err.style.display = 'block'; err.textContent = '이름을 입력하세요.'; return; }
+  if (!email) { err.style.display = 'block'; err.textContent = '이메일을 입력하세요.'; return; }
+  if (pw.length < 6) { err.style.display = 'block'; err.textContent = '비밀번호는 6자리 이상이어야 합니다.'; return; }
+  if (pw !== pw2) { err.style.display = 'block'; err.textContent = '비밀번호가 일치하지 않습니다.'; return; }
+
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, pw);
+    await cred.user.updateProfile({ displayName: name });
+    await db.collection('users').doc(cred.user.uid).set({
+      email,
+      name,
+      role: 'student',
+      progress: {},
+      completedCourses: [],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) {
+    err.style.display = 'block';
+    if (e.code === 'auth/email-already-in-use') err.textContent = '이미 사용 중인 이메일입니다.';
+    else err.textContent = '회원가입 중 오류가 발생했습니다.';
+  }
+}
+
+function toggleAuthForm(type) {
+  $('form-login').style.display = type === 'login' ? 'block' : 'none';
+  $('form-signup').style.display = type === 'signup' ? 'block' : 'none';
+}
+
 function handleLogout() {
   auth.signOut();
 }
