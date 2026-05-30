@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marst AI Web Studio · 학습 플랫폼</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+
+<!-- ===== 로그인 페이지 ===== -->
+<div id="login-page" class="login-page">
+  <div class="card login-box">
+    <div class="login-logo">
+      <div class="company">Marst AI Web Studio</div>
+      <h1>코딩 학습<br>플랫폼</h1>
+      <p>학습하고, 성장하세요.</p>
+    </div>
+
+    <!-- 로그인 폼 -->
+    <div id="form-login">
+      <div id="login-error" class="login-error"></div>
+      <div class="form-group">
+        <label>이메일</label>
+        <input type="email" id="login-email" placeholder="이메일 입력" onkeydown="if(event.key==='Enter')handleLogin()">
+      </div>
+      <div class="form-group">
+        <label>비밀번호</label>
+        <input type="password" id="login-pw" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')handleLogin()">
+      </div>
+      <button class="btn btn-primary" onclick="handleLogin()">로그인</button>
+      <p style="text-align:center;margin-top:14px;font-size:13px;color:var(--text-muted)">
+        계정이 없으신가요? <a href="#" onclick="toggleAuthForm('signup')" style="color:var(--primary);font-weight:500">회원가입</a>
+      </p>
+    </div>
+
+    <!-- 회원가입 폼 -->
+    <div id="form-signup" style="display:none">
+      <div id="signup-error" class="login-error"></div>
+      <div class="form-group">
+        <label>이름</label>
+        <input type="text" id="signup-name" placeholder="이름 입력">
+      </div>
+      <div class="form-group">
+        <label>이메일</label>
+        <input type="email" id="signup-email" placeholder="이메일 입력">
+      </div>
+      <div class="form-group">
+        <label>비밀번호</label>
+        <input type="password" id="signup-pw" placeholder="6자리 이상">
+      </div>
+      <div class="form-group">
+        <label>비밀번호 확인</label>
+        <input type="password" id="signup-pw2" placeholder="비밀번호 재입력">
+      </div>
+      <button class="btn btn-primary" onclick="handleSignup()">회원가입</button>
+      <p style="text-align:center;margin-top:14px;font-size:13px;color:var(--text-muted)">
+        이미 계정이 있으신가요? <a href="#" onclick="toggleAuthForm('login')" style="color:var(--primary);font-weight:500">로그인</a>
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 앱 ===== -->
+<div id="app">
+  <div class="app-layout">
+
+    <!-- 사이드바 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="company">Marst AI Web Studio</div>
+        <h2>학습 플랫폼</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section">메뉴</div>
+        <a class="nav-item" data-page="dashboard" onclick="navigate('dashboard')">
+          <span class="icon">🏠</span> 홈
+        </a>
+        <a class="nav-item" data-page="courses" onclick="navigate('courses')">
+          <span class="icon">📚</span> 학습 목록
+        </a>
+
+        <div class="nav-section admin-only" style="display:none">관리자</div>
+        <a class="nav-item admin-only" data-page="admin-content" style="display:none" onclick="navigate('admin-content')">
+          <span class="icon">📁</span> 콘텐츠 관리
+        </a>
+        <a class="nav-item admin-only" data-page="admin-quiz" style="display:none" onclick="navigate('admin-quiz')">
+          <span class="icon">❓</span> 퀴즈 관리
+        </a>
+        <a class="nav-item admin-only" data-page="admin-progress" style="display:none" onclick="navigate('admin-progress')">
+          <span class="icon">📊</span> 진도율 확인
+        </a>
+        <a class="nav-item admin-only" data-page="admin-settings" style="display:none" onclick="navigate('admin-settings')">
+          <span class="icon">⚙️</span> 설정
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar" id="user-avatar">?</div>
+          <div>
+            <div class="user-name" id="user-name">-</div>
+            <div class="user-role" id="user-role">-</div>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center" onclick="handleLogout()">로그아웃</button>
+      </div>
+    </aside>
+
+    <!-- 메인 -->
+    <main class="main-content">
+      <div id="page-content">
+        <div class="spinner"></div>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<!-- ===== 콘텐츠 추가/수정 모달 ===== -->
+<div class="modal-overlay" id="content-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">새 콘텐츠 추가</h3>
+      <button class="modal-close" onclick="closeModal('content-modal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>학습 유형</label>
+      <select id="content-form-type" onchange="toggleContentFields()">
+        <option value="text">📝 글 학습</option>
+        <option value="video">🎥 영상 학습</option>
+        <option value="ppt">📊 PPT 학습</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>제목</label>
+      <input type="text" id="content-form-title" placeholder="학습 제목 입력">
+    </div>
+    <div class="form-group">
+      <label>설명 (선택)</label>
+      <input type="text" id="content-form-desc" placeholder="학습 목록에 표시될 짧은 설명">
+    </div>
+    <div class="form-group" id="field-body">
+      <label>본문 내용</label>
+      <textarea id="content-form-body" rows="8" placeholder="학습 내용을 입력하세요..."></textarea>
+    </div>
+    <div class="form-group hidden" id="field-url">
+      <label id="url-label">영상 URL</label>
+      <input type="url" id="content-form-url" placeholder="https://...">
+    </div>
+    <div class="form-group hidden" id="field-file">
+      <label>파일 직접 업로드 (선택)</label>
+      <input type="file" id="content-form-file" accept=".mp4,.mov,.pptx,.pdf">
+      <p style="font-size:12px;color:var(--text-muted);margin-top:4px">URL 또는 파일 중 하나만 사용하세요.</p>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-outline" onclick="closeModal('content-modal')">취소</button>
+      <button class="btn btn-primary" onclick="saveContent()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 퀴즈 추가/수정 모달 ===== -->
+<div class="modal-overlay" id="quiz-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="quiz-modal-title">퀴즈 추가</h3>
+      <button class="modal-close" onclick="closeModal('quiz-modal')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>문제</label>
+      <textarea id="quiz-form-question" rows="3" placeholder="문제를 입력하세요..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>보기 1</label>
+      <input type="text" id="quiz-opt-0" placeholder="보기 1">
+    </div>
+    <div class="form-group">
+      <label>보기 2</label>
+      <input type="text" id="quiz-opt-1" placeholder="보기 2">
+    </div>
+    <div class="form-group">
+      <label>보기 3</label>
+      <input type="text" id="quiz-opt-2" placeholder="보기 3">
+    </div>
+    <div class="form-group">
+      <label>보기 4</label>
+      <input type="text" id="quiz-opt-3" placeholder="보기 4">
+    </div>
+    <div class="form-group">
+      <label>정답</label>
+      <select id="quiz-form-answer">
+        <option value="0">보기 1</option>
+        <option value="1">보기 2</option>
+        <option value="2">보기 3</option>
+        <option value="3">보기 4</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-outline" onclick="closeModal('quiz-modal')">취소</button>
+      <button class="btn btn-primary" onclick="saveQuiz()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
