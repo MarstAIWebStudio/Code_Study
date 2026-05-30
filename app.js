@@ -222,7 +222,7 @@ function courseCardHTML(id, data) {
   const [icon, badgeClass, label] = typeMap[data.type] || ['📄', 'badge-text', '학습'];
 
   return `
-    <div class="card course-card" onclick="navigate('viewer', {id:'${id}', ...${JSON.stringify(data).replace(/'/g,"\\'")}})">
+    <div class="card course-card" onclick="openCourse('${id}')">
       ${completed ? '<div class="done-check">✅</div>' : ''}
       <div class="course-type"><span class="badge ${badgeClass}">${icon} ${label}</span></div>
       <h3>${data.title}</h3>
@@ -232,6 +232,12 @@ function courseCardHTML(id, data) {
       </div>
     </div>
   `;
+}
+
+async function openCourse(courseId) {
+  const doc = await db.collection('courses').doc(courseId).get();
+  if (!doc.exists) { showToast('학습을 찾을 수 없습니다.', 'error'); return; }
+  navigate('viewer', { id: courseId, ...doc.data() });
 }
 
 // ===== 학습 뷰어 =====
