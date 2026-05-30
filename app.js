@@ -149,6 +149,7 @@ function navigate(page, data = null) {
     case 'admin-quiz': renderAdminQuiz(data); break;
     case 'admin-progress': renderAdminProgress(); break;
     case 'admin-settings': renderAdminSettings(); break;
+    default: renderDashboard(); break;
   }
 }
 
@@ -240,59 +241,77 @@ async function openCourse(courseId) {
   navigate('viewer', { id: courseId, ...doc.data() });
 }
 
-// ===== 학습 뷰어 =====
+// ===== 학습 뷰어 (모달) =====
 async function renderViewer(courseData) {
   if (!courseData) return;
 
+  // 기존 뷰어 모달 제거
+  const existing = document.getElementById('viewer-modal-overlay');
+  if (existing) existing.remove();
+
   let contentHTML = '';
   if (courseData.type === 'text') {
-    contentHTML = `<div class="viewer-text-content">${(courseData.content || '').replace(/\n/g, '<br>')}</div>`;
+    contentHTML = `<div style="line-height:1.9;font-size:15px">${(courseData.content || '').replace(/\n/g, '<br>')}</div>`;
   } else if (courseData.type === 'video') {
     const url = courseData.fileUrl || '';
-    // YouTube embed 처리
     const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/watch\?v=)([^&]+)/);
     if (ytMatch) {
-      contentHTML = `<div class="viewer-video-content"><iframe src="https://www.youtube.com/embed/${ytMatch[1]}" allowfullscreen></iframe></div>`;
+      contentHTML = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px">
+        <iframe src="https://www.youtube.com/embed/${ytMatch[1]}" allowfullscreen
+          style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;border-radius:8px"></iframe>
+      </div>`;
     } else {
-      contentHTML = `<div class="viewer-video-content"><video controls src="${url}"></video></div>`;
+      contentHTML = `<video controls src="${url}" style="width:100%;border-radius:8px"></video>`;
     }
   } else if (courseData.type === 'ppt') {
     const url = courseData.fileUrl || '';
-    // Google Slides 또는 Office Online 임베드
     const embedUrl = url.includes('docs.google.com') ? url.replace('/edit', '/embed') :
       `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
-    contentHTML = `<div class="viewer-ppt-content"><iframe src="${embedUrl}" allowfullscreen></iframe></div>`;
+    contentHTML = `<div style="position:relative;padding-bottom:60%;height:0;overflow:hidden;border-radius:8px">
+      <iframe src="${embedUrl}" allowfullscreen
+        style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;border-radius:8px"></iframe>
+    </div>`;
   }
 
   const typeMap = { text: 'badge-text', video: 'badge-video', ppt: 'badge-ppt' };
   const labelMap = { text: '📝 글 학습', video: '🎥 영상 학습', ppt: '📊 PPT 학습' };
 
-  $('page-content').innerHTML = `
-    <div class="viewer-wrap">
-      <div class="viewer-header">
-        <button class="btn btn-outline btn-sm" onclick="navigate('courses')">← 목록으로</button>
-        <div>
-          <span class="badge ${typeMap[courseData.type] || 'badge-text'}">${labelMap[courseData.type] || '학습'}</span>
-        </div>
+  const overlay = document.createElement('div');
+  overlay.id = 'viewer-modal-overlay';
+  overlay.className = 'viewer-modal-overlay';
+  overlay.innerHTML = `
+    <div class="viewer-modal">
+      <div class="viewer-modal-header">
+        <span class="badge ${typeMap[courseData.type] || 'badge-text'}">${labelMap[courseData.type] || '학습'}</span>
         <h2>${courseData.title}</h2>
+        <button class="modal-close" onclick="closeViewerModal()">✕</button>
       </div>
-      <div class="card viewer-body">
-        ${contentHTML}
-      </div>
-      <div class="viewer-nav">
-        <p style="font-size:13px;color:var(--text-muted)">학습을 완료했나요?</p>
+      <div class="viewer-modal-body">${contentHTML}</div>
+      <div class="viewer-modal-footer">
+        <button class="btn btn-outline" onclick="closeViewerModal()">닫기</button>
         <button class="btn btn-primary" onclick="completeCourse('${courseData.id}')">✅ 학습 완료</button>
       </div>
     </div>
   `;
+  // 배경 클릭으로 닫기
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeViewerModal(); });
+  document.body.appendChild(overlay);
+
+  // 페이지는 현재 위치 유지
+  if (App.currentPage !== 'viewer') navigate(App.currentPage || 'courses');
+}
+
+function closeViewerModal() {
+  const overlay = document.getElementById('viewer-modal-overlay');
+  if (overlay) overlay.remove();
 }
 
 async function completeCourse(courseId) {
+  closeViewerModal();
   const completed = App.userDoc.completedCourses || [];
   if (completed.includes(courseId)) {
     showToast('이미 완료한 학습입니다.', 'info');
-    // 퀴즈로 바로 이동 가능
-    navigate('quiz', courseId);
+    setTimeout(() => startQuiz(courseId), 400);
     return;
   }
   completed.push(courseId);
@@ -302,84 +321,93 @@ async function completeCourse(courseId) {
   });
   App.userDoc.completedCourses = completed;
   showToast('학습을 완료했습니다! 퀴즈를 시작합니다.', 'success');
-  setTimeout(() => navigate('quiz', courseId), 1000);
+  setTimeout(() => startQuiz(courseId), 1000);
 }
 
-// ===== 퀴즈 =====
+// ===== 퀴즈 (모달) =====
 async function startQuiz(courseId) {
   const snap = await db.collection('courses').doc(courseId).collection('quizzes').get();
   if (snap.empty) {
-    $('page-content').innerHTML = `
-      <div class="page-header"><h1>퀴즈</h1></div>
-      <div class="empty-state"><div class="empty-icon">❓</div><p>등록된 퀴즈가 없습니다.</p><br>
-      <button class="btn btn-outline" onclick="navigate('courses')">← 목록으로</button></div>
-    `;
+    showToast('등록된 퀴즈가 없습니다.', 'info');
     return;
   }
-
-  // 랜덤 5개 선택
   const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   const shuffled = all.sort(() => Math.random() - 0.5).slice(0, 5);
   App.quizData = shuffled;
   App.quizIndex = 0;
   App.quizScore = 0;
-
-  renderQuizQuestion();
+  renderQuizModal();
 }
 
-function renderQuizQuestion() {
-  const q = App.quizData[App.quizIndex];
-  if (!q) { renderQuizResult(); return; }
+function renderQuizModal() {
+  const existing = document.getElementById('quiz-modal-overlay');
+  if (existing) existing.remove();
 
-  $('page-content').innerHTML = `
-    <div class="quiz-wrap">
-      <div class="page-header"><h1>퀴즈</h1></div>
-      <div class="card" style="padding:28px">
-        <div class="quiz-progress">${App.quizIndex + 1} / ${App.quizData.length}</div>
-        <div class="progress-bar-wrap" style="margin-bottom:20px">
-          <div class="progress-bar" style="width:${((App.quizIndex)/App.quizData.length)*100}%"></div>
-        </div>
-        <div class="quiz-q">${q.question}</div>
-        <div class="quiz-options">
-          ${(q.options || []).map((opt, i) => `
-            <div class="quiz-option" onclick="answerQuiz(${i}, ${q.answer}, this)">${opt}</div>
-          `).join('')}
-        </div>
+  const q = App.quizData[App.quizIndex];
+  if (!q) { renderQuizResultModal(); return; }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'quiz-modal-overlay';
+  overlay.className = 'quiz-modal-overlay';
+  overlay.innerHTML = `
+    <div class="quiz-modal-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="font-size:18px;font-weight:600">퀴즈</h3>
+        <button class="modal-close" onclick="closeQuizModal()">✕</button>
+      </div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:6px">${App.quizIndex + 1} / ${App.quizData.length}</div>
+      <div class="progress-bar-wrap" style="margin-bottom:20px">
+        <div class="progress-bar" style="width:${(App.quizIndex/App.quizData.length)*100}%"></div>
+      </div>
+      <div style="font-size:17px;font-weight:600;margin-bottom:20px;line-height:1.5">${q.question}</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${(q.options || []).map((opt, i) => `
+          <div class="quiz-option" onclick="answerQuizModal(${i}, ${q.answer}, this)">${opt}</div>
+        `).join('')}
       </div>
     </div>
   `;
+  document.body.appendChild(overlay);
 }
 
-function answerQuiz(selected, correct, el) {
-  document.querySelectorAll('.quiz-option').forEach(o => o.style.pointerEvents = 'none');
+function answerQuizModal(selected, correct, el) {
+  document.querySelectorAll('#quiz-modal-overlay .quiz-option').forEach(o => o.style.pointerEvents = 'none');
   if (selected === correct) {
     el.classList.add('correct');
     App.quizScore++;
   } else {
     el.classList.add('wrong');
-    document.querySelectorAll('.quiz-option')[correct].classList.add('correct');
+    document.querySelectorAll('#quiz-modal-overlay .quiz-option')[correct].classList.add('correct');
   }
   setTimeout(() => {
     App.quizIndex++;
-    renderQuizQuestion();
+    renderQuizModal();
   }, 1000);
 }
 
-function renderQuizResult() {
+function renderQuizResultModal() {
+  const existing = document.getElementById('quiz-modal-overlay');
+  if (existing) existing.remove();
+
   const pct = Math.round((App.quizScore / App.quizData.length) * 100);
   const msg = pct >= 80 ? '훌륭해요! 🎉' : pct >= 60 ? '잘 했어요! 👍' : '다시 도전해보세요 💪';
-  $('page-content').innerHTML = `
-    <div class="quiz-wrap">
-      <div class="card quiz-result">
-        <div class="score">${App.quizScore}/${App.quizData.length}</div>
-        <div class="score-label">${pct}점 · ${msg}</div>
-        <div style="margin-top:28px;display:flex;gap:12px;justify-content:center">
-          <button class="btn btn-outline" onclick="navigate('courses')">← 학습 목록</button>
-          <button class="btn btn-primary" onclick="navigate('dashboard')">🏠 홈으로</button>
-        </div>
-      </div>
+
+  const overlay = document.createElement('div');
+  overlay.id = 'quiz-modal-overlay';
+  overlay.className = 'quiz-modal-overlay';
+  overlay.innerHTML = `
+    <div class="quiz-modal-box" style="text-align:center">
+      <div style="font-family:'Black Han Sans',sans-serif;font-size:64px;color:var(--primary)">${App.quizScore}/${App.quizData.length}</div>
+      <div style="font-size:16px;color:var(--text-muted);margin-top:6px">${pct}점 · ${msg}</div>
+      <button class="btn btn-primary" style="margin-top:28px;width:100%;justify-content:center" onclick="closeQuizModal()">닫기</button>
     </div>
   `;
+  document.body.appendChild(overlay);
+}
+
+function closeQuizModal() {
+  const overlay = document.getElementById('quiz-modal-overlay');
+  if (overlay) overlay.remove();
 }
 
 // ===== 관리자: 콘텐츠 관리 =====
