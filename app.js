@@ -550,46 +550,50 @@ async function renderAdminProgress() {
   ]);
 
   const totalCourses = coursesSnap.size;
+  const courses = coursesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
   $('page-content').innerHTML = `
     <div class="page-header">
       <h1>학습자 진도율</h1>
       <p>총 ${usersSnap.size}명의 학습자</p>
     </div>
-    <div class="card" style="overflow:hidden">
+    <div class="card" style="overflow-x:auto">
       <table class="student-table">
         <thead>
           <tr>
             <th>이름</th>
-            <th>이메일</th>
-            <th>완료 학습</th>
             <th>진도율</th>
-            <th>가입일</th>
+            ${courses.map(c => `<th style="text-align:center;min-width:80px;font-size:11px">${c.title}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
-          ${usersSnap.empty ? `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">학습자가 없습니다.</td></tr>` :
-            usersSnap.docs.map(d => {
-              const u = d.data();
-              const done = (u.completedCourses || []).length;
-              const pct = totalCourses > 0 ? Math.round((done / totalCourses) * 100) : 0;
-              return `
-                <tr>
-                  <td><strong>${u.name || '-'}</strong></td>
-                  <td style="color:var(--text-muted)">${u.email}</td>
-                  <td>${done} / ${totalCourses}</td>
-                  <td>
-                    <div style="display:flex;align-items:center;gap:8px">
-                      <div class="progress-bar-wrap" style="width:80px;margin:0">
-                        <div class="progress-bar" style="width:${pct}%"></div>
+          ${usersSnap.empty
+            ? `<tr><td colspan="${3 + courses.length}" style="text-align:center;color:var(--text-muted);padding:24px">학습자가 없습니다.</td></tr>`
+            : usersSnap.docs.map(d => {
+                const u = d.data();
+                const done = (u.completedCourses || []).length;
+                const pct = totalCourses > 0 ? Math.round((done / totalCourses) * 100) : 0;
+                return `
+                  <tr>
+                    <td>
+                      <strong>${u.name || '-'}</strong>
+                      <div style="font-size:11px;color:var(--text-muted)">${u.email}</div>
+                    </td>
+                    <td>
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <div class="progress-bar-wrap" style="width:70px;margin:0">
+                          <div class="progress-bar" style="width:${pct}%"></div>
+                        </div>
+                        <span style="font-size:13px;font-weight:500">${pct}%</span>
                       </div>
-                      <span style="font-size:13px">${pct}%</span>
-                    </div>
-                  </td>
-                  <td style="color:var(--text-muted)">${formatDate(u.createdAt)}</td>
-                </tr>
-              `;
-            }).join('')}
+                    </td>
+                    ${courses.map(c => {
+                      const isDone = (u.completedCourses || []).includes(c.id);
+                      return `<td style="text-align:center;font-size:16px">${isDone ? '✅' : '○'}</td>`;
+                    }).join('')}
+                  </tr>
+                `;
+              }).join('')}
         </tbody>
       </table>
     </div>
